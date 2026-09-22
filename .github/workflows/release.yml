@@ -121,6 +121,13 @@ jobs:
           git push origin "${FULL_TAG}" --force
           git push origin "${MAJOR_TAG}" --force
 
+      - name: Generate release notes
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          VERSION="${VERSION#v}"
+          python .github/scripts/generate_release_notes.py --version "${VERSION}" --output RELEASE_NOTES.md
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -132,10 +139,10 @@ jobs:
           # Delete existing release if it already exists
           gh release delete "${FULL_TAG}" --yes 2>/dev/null || true
 
-          # Create a new release with auto-generated notes
+          # Create a new release using our generated notes
           gh release create "${FULL_TAG}" \
             --title "Release ${FULL_TAG}" \
-            --generate-notes \
+            --notes-file RELEASE_NOTES.md\
             --target main
 
       - name: Summary
