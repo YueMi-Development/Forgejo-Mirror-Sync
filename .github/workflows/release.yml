@@ -19,9 +19,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install PyYAML
+        run: pip install pyyaml
+
       - name: Validate action.yml
-        run: |
-          python3 -c "import yaml; yaml.safe_load(open('action.yml')); print('action.yml is valid')"
+        run: python .github/scripts/validate_action.py
 
       - name: Configure Git
         run: |
