@@ -29,8 +29,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install PyYAML
-        run: pip install pyyaml
+      - name: Install Python dependencies
+        run: pip install -r .github/scripts/requirements.txt
 
       - name: Validate action.yml
         run: python .github/scripts/validate_action.py
