@@ -1,3 +1,10 @@
+## [v1.0.2] - 2026-09-22
+
+- Trigger release workflow on v*.*.* tag push and support version from tag
+- Trigger release workflow on v*.*.* tag push and support version from tag or input
+- Add release notes generator and use generated notes for GitHub Release
+
+
 ## [v1.0.1] - 2026-09-22
 
 - Fix release workflow to allow re-releasing the same version
