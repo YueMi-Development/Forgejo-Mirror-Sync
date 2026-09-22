@@ -117,8 +117,8 @@ jobs:
           git tag -a "${FULL_TAG}" -m "Release ${FULL_TAG}"
           git tag -fa "${MAJOR_TAG}" -m "Release ${FULL_TAG} (major version)"
 
-          # Push tags
-          git push origin "${FULL_TAG}"
+          # Push tags (force so re-releases overwrite existing tags)
+          git push origin "${FULL_TAG}" --force
           git push origin "${MAJOR_TAG}" --force
 
       - name: Create GitHub Release
@@ -128,6 +128,11 @@ jobs:
         run: |
           VERSION="${VERSION#v}"
           FULL_TAG="v${VERSION}"
+
+          # Delete existing release if it already exists
+          gh release delete "${FULL_TAG}" --yes 2>/dev/null || true
+
+          # Create a new release with auto-generated notes
           gh release create "${FULL_TAG}" \
             --title "Release ${FULL_TAG}" \
             --generate-notes \
