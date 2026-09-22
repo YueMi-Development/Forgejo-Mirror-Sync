@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate action.yml
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('action.yml')); print('action.yml is valid')"
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create release branch and tags
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          # Strip leading 'v' if present
+          VERSION="${VERSION#v}"
+
+          # Create full version tag (e.g. v1.0.0)
+          FULL_TAG="v${VERSION}"
+          # Create major version tag (e.g. v1)
+          MAJOR_TAG="v${VERSION%%.*}"
+          # Create archive/release branch (e.g. release/v1.0.0)
+          BRANCH="release/v${VERSION}"
+
+          echo "Releasing ${FULL_TAG}, updating ${MAJOR_TAG}, and creating ${BRANCH}"
+
+          # Delete existing tags/branches locally if they exist
+          git tag -d "${FULL_TAG}" 2>/dev/null || true
+          git tag -d "${MAJOR_TAG}" 2>/dev/null || true
+          git branch -D "${BRANCH}" 2>/dev/null || true
+
+          # Create archive branch and push it
+          git checkout -b "${BRANCH}"
+          git push origin "${BRANCH}" --force
+
+          # Return to the original branch
+          git checkout -
+
+          # Create tags pointing to current commit
+          git tag -a "${FULL_TAG}" -m "Release ${FULL_TAG}"
+          git tag -fa "${MAJOR_TAG}" -m "Release ${FULL_TAG} (major version)"
+
+          # Push tags
+          git push origin "${FULL_TAG}"
+          git push origin "${MAJOR_TAG}" --force
+
+      - name: Summary
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          VERSION="${VERSION#v}"
+          echo "Released v${VERSION} and v${VERSION%%.*}, created release/v${VERSION}"

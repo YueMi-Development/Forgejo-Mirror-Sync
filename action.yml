@@ -1,0 +1,69 @@
+name: 'Forgejo Mirror Sync'
+description: 'Parse a Forgejo mirror repository URL and trigger a mirror sync via the Forgejo API.'
+
+inputs:
+  repo_url:
+    description: 'Full Forgejo mirror repository URL (e.g. https://git.example.com/owner/repo).'
+    required: true
+  token:
+    description: 'Forgejo API token with permission to trigger mirror sync.'
+    required: true
+
+outputs:
+  domain:
+    description: 'The Forgejo domain extracted from the mirror URL.'
+    value: ${{ steps.parse.outputs.domain }}
+  owner:
+    description: 'The repository owner extracted from the mirror URL.'
+    value: ${{ steps.parse.outputs.owner }}
+  repo:
+    description: 'The repository name extracted from the mirror URL.'
+    value: ${{ steps.parse.outputs.repo }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Parse Mirror URL
+      id: parse
+      shell: bash
+      env:
+        MIRROR_URL: ${{ inputs.repo_url }}
+      run: |
+        URL="${MIRROR_URL}"
+        URL="${URL#http://}"
+        URL="${URL#https://}"
+
+        DOMAIN=$(echo "$URL" | cut -d'/' -f1)
+        OWNER=$(echo "$URL" | cut -d'/' -f2)
+        REPO=$(echo "$URL" | cut -d'/' -f3 | sed 's/\.git$//')
+
+        echo "domain=$DOMAIN" >> "$GITHUB_OUTPUT"
+        echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+        echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+
+    - name: Trigger Forgejo Mirror Sync
+      shell: bash
+      env:
+        DOMAIN: ${{ steps.parse.outputs.domain }}
+        OWNER: ${{ steps.parse.outputs.owner }}
+        REPO: ${{ steps.parse.outputs.repo }}
+        FORGEJO_TOKEN: ${{ inputs.token }}
+      run: |
+        echo "Triggering mirror sync for ${OWNER}/${REPO} on ${DOMAIN}..."
+
+        RESPONSE=$(curl -w "\nHTTP_STATUS:%{http_code}" -s -X POST \
+          -H "Authorization: token ${FORGEJO_TOKEN}" \
+          -H "Content-Type: application/json" \
+          "https://${DOMAIN}/api/v1/repos/${OWNER}/${REPO}/mirror-sync")
+
+        BODY=$(echo "$RESPONSE" | sed '/HTTP_STATUS:/d')
+        STATUS=$(echo "$RESPONSE" | tr -d '\n' | grep -o 'HTTP_STATUS:[0-9]\{3\}' | cut -d':' -f2)
+
+        echo "Response Body:"
+        echo "$BODY"
+        echo "HTTP Status Code: $STATUS"
+
+        if [ "$STATUS" -lt 200 ] || [ "$STATUS" -ge 300 ]; then
+          echo "Error: Mirror sync failed with status $STATUS"
+          exit 1
+        fi
