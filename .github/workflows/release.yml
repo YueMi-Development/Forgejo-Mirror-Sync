@@ -1,6 +1,9 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
   workflow_dispatch:
     inputs:
       version:
@@ -37,9 +40,22 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      - name: Determine version
+        id: version
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          if [ -n "${INPUT_VERSION}" ]; then
+            VERSION="${INPUT_VERSION#v}"
+          else
+            VERSION="${REF_NAME#v}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
       - name: Update CHANGELOG.md
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           VERSION="${VERSION#v}"
           FULL_TAG="v${VERSION}"
@@ -73,7 +89,7 @@ jobs:
 
       - name: Commit and push CHANGELOG.md
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           VERSION="${VERSION#v}"
           FULL_TAG="v${VERSION}"
@@ -87,7 +103,7 @@ jobs:
 
       - name: Create release branch and tags
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           # Strip leading 'v' if present
           VERSION="${VERSION#v}"
@@ -123,7 +139,7 @@ jobs:
 
       - name: Generate release notes
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           VERSION="${VERSION#v}"
           python .github/scripts/generate_release_notes.py --version "${VERSION}" --output RELEASE_NOTES.md
@@ -131,7 +147,7 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           VERSION="${VERSION#v}"
           FULL_TAG="v${VERSION}"
@@ -142,12 +158,12 @@ jobs:
           # Create a new release using our generated notes
           gh release create "${FULL_TAG}" \
             --title "Release ${FULL_TAG}" \
-            --notes-file RELEASE_NOTES.md\
+            --notes-file RELEASE_NOTES.md \
             --target main
 
       - name: Summary
         env:
-          VERSION: ${{ github.event.inputs.version }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           VERSION="${VERSION#v}"
           echo "Released v${VERSION} and v${VERSION%%.*}, created release/v${VERSION}"
